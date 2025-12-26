@@ -1,0 +1,109 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# LocalStack volumes and data
+localstack/volume/cache/
+localstack/volume/lib/
+localstack/volume/logs/
+localstack/volume/tmp/
+localstack/lambda-functions/target/
+
+# Environment variables and secrets
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.crt
+credentials
+secrets.yml
+secrets.yaml
+
+# AWS credentials
+.aws/
+
+# Ansible
+*.retry
+ansible.log
+
+# Jenkins
+jenkins/secrets/
+jenkins/workspace/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/
+*.out
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+
+# Python virtual environments (not terraform env/ folders)
+**/venv/
+**/.venv/
+**/virtualenv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
