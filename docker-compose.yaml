@@ -1,0 +1,92 @@
+version: '3.9'
+
+services:
+  # LocalStack service - AWS emulator
+  localstack:
+    container_name: localstack
+    image: localstack/localstack-pro:latest
+    networks:
+      - cicd_network
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+      - "127.0.0.1:53:53"
+      - "127.0.0.1:53:53/udp"
+    environment:
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LOCALSTACK_HOST=localstack
+      - ENFORCE_IAM=0
+      - LAMBDA_DOCKER_NETWORK=cicd_network
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=60
+      - DNS_ADDRESS=127.0.0.1
+      - PERSIST_ALL=false
+    volumes:
+      - "./localstack/volume:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./localstack/lambda-functions/target/product-lambda.jar:/etc/localstack/init/ready.d/target/product-lambda.jar"
+      - "./localstack/lambda-functions/lambda-python/healthcheck.zip:/etc/localstack/init/ready.d/healthcheck.zip"
+      - "./localstack/init-resources.sh:/etc/localstack/init/ready.d/init-resources.sh"
+
+  # Jenkins service - CI/CD automation
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    image: jenkins-jdk-17
+    container_name: jenkins-jdk-17
+    privileged: true
+    user: root
+    restart: always
+    networks:
+      - cicd_network
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+      - ./ansible:/ansible
+    environment:
+      # LocalStack endpoint accessible from Jenkins
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - ANSIBLE_HOST=ansible
+    depends_on:
+      - localstack
+
+  # Ansible service - Infrastructure automation & configuration management
+  ansible:
+    build:
+      context: ./ansible
+      dockerfile: Dockerfile
+    image: ansible-controller
+    container_name: ansible-controller
+    networks:
+      - cicd_network
+    volumes:
+      - ./ansible/playbooks:/ansible/playbooks
+      - ./ansible/inventory:/ansible/inventory
+      - ./ansible/roles:/ansible/roles
+      - ansible_cache:/root/.ansible
+    environment:
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    command: tail -f /dev/null
+    depends_on:
+      - localstack
+
+networks:
+  cicd_network:
+    name: cicd_network
+    driver: bridge
+
+volumes:
+  jenkins_home:
+    name: jenkins_home
+  ansible_cache:
+    name: ansible_cache

@@ -1,6 +1,6 @@
 # 🌐 Hệ thống CI/CD Pipeline GitOps End-to-End với LocalStack
 
-Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container sử dụng **LocalStack** để mô phỏng môi trường AWS. Dự án này sử dụng **Terraform** để khởi tạo hạ tầng AWS (qua LocalStack), **Jenkins** cho continuous integration, và **ArgoCD** cho GitOps-based deployment lên **Kubernetes** cluster.
+Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container sử dụng **LocalStack** để mô phỏng môi trường AWS. Dự án này sử dụng **Terraform** để khởi tạo hạ tầng AWS (qua LocalStack), **Jenkins** cho continuous integration, **Ansible** cho automation và configuration management, và **ArgoCD** cho GitOps-based deployment lên **Kubernetes** cluster.
 
 > **Lưu ý**: Đây là môi trường **học tập và phát triển** sử dụng LocalStack để mô phỏng các dịch vụ AWS mà không phát sinh chi phí.
 
@@ -25,6 +25,11 @@ Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container s�
   - Jenkins Master để điều phối CI pipeline
   - Thực thi các jobs: build, test, scan, deploy
 
+- **Ansible Container**:
+  - Automation và configuration management
+  - Deploy resources lên LocalStack/AWS
+  - Quản lý infrastructure state
+
 - **Các dịch vụ AWS được mô phỏng**:
   - **S3**: Lưu trữ Terraform state, artifacts
   - **ECR**: Container registry để lưu Docker images
@@ -37,13 +42,18 @@ Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container s�
 ### 2. ⚙️ Quản lý Cấu hình
 
 - **Docker Compose**:
-  - Quản lý lifecycle của LocalStack và Jenkins containers
-  - Kết nối các services qua Docker network
+  - Quản lý lifecycle của LocalStack, Jenkins và Ansible containers
+  - Kết nối các services qua Docker network chung (cicd_network)
 
 - **Terraform**:
   - Infrastructure as Code để khởi tạo resources trên LocalStack
   - Quản lý state file
   - Tự động provision S3 buckets, ECR repos, Lambda functions, etc.
+
+- **Ansible**:
+  - Configuration management và automation tasks
+  - Deploy và configure AWS resources trên LocalStack
+  - Tích hợp với Jenkins pipeline để orchestrate deployments
 
 - **Init Scripts**:
   - Tự động khởi tạo resources khi LocalStack startup
@@ -107,14 +117,20 @@ Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container s�
 
 ```bash
 .
-├── localstack/              # LocalStack docker-compose và init scripts
-│   ├── docker-compose.yaml  # LocalStack container configuration
+├── docker-compose.yaml      # Docker Compose gộp chung: LocalStack, Jenkins, Ansible
+├── localstack/              # LocalStack configuration và init scripts
 │   ├── init-resources.sh    # Script khởi tạo resources
 │   ├── lambda-functions/    # Lambda function code
 │   └── volume/              # LocalStack persistent data
 ├── jenkins/                 # Jenkins docker setup
-│   ├── docker-compose.yaml  # Jenkins container configuration
-│   └── Dockerfile           # Custom Jenkins image với tools
+│   ├── Dockerfile           # Custom Jenkins image với tools
+│   └── ...                  # Jenkins configurations
+├── ansible/                 # Ansible automation
+│   ├── Dockerfile           # Ansible controller image
+│   ├── ansible.cfg          # Ansible configuration
+│   ├── playbooks/           # Ansible playbooks
+│   ├── inventory/           # Inventory files (hosts)
+│   └── roles/               # Ansible roles
 ├── terraform/               # Terraform modules & scripts
 │   ├── aws/                 # AWS resources configuration
 │   ├── deploy.sh            # Deploy script
@@ -137,10 +153,41 @@ Mô phỏng các dịch vụ AWS:
 
 **Cách khởi động**:
 ```bash
-cd localstack
+# Chạy tất cả services từ root
 export LOCALSTACK_AUTH_TOKEN=your-token-here
 docker-compose up -d
 ```
+
+---
+
+### 🤖 Ansible (Automation & Configuration Management)
+
+**Mục đích**:
+- Tự động hóa deployment resources lên LocalStack/AWS
+- Configuration management cho infrastructure
+- Orchestration tasks trong CI/CD pipeline
+
+**Cấu trúc**:
+- **Inventory**: Định nghĩa các target hosts (localhost, LocalStack)
+- **Playbooks**: Kịch bản automation (YAML format)
+- **Roles**: Tái sử dụng logic cho các tasks phổ biến
+
+**Ví dụ sử dụng**:
+```bash
+# Chạy playbook từ Ansible container
+docker exec ansible-controller ansible-playbook \
+  -i /ansible/inventory/hosts \
+  /ansible/playbooks/deploy-to-localstack.yml
+
+# Hoặc từ Jenkins pipeline
+docker exec ansible-controller ansible-playbook /ansible/playbooks/setup.yml
+```
+
+**Tính năng chính**:
+- ✅ Deploy AWS resources (S3, Lambda, DynamoDB) lên LocalStack
+- ✅ Configure applications và services
+- ✅ Idempotent operations (chạy nhiều lần không gây lỗi)
+- ✅ Tích hợp với Jenkins pipeline
 
 ---
 
@@ -223,17 +270,22 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 
 ## 🚀 Hướng dẫn Triển khai
 
-### Bước 1: Khởi động LocalStack
+### Bước 1: Khởi động tất cả services (LocalStack, Jenkins, Ansible)
 ```bash
-cd localstack
+# Từ thư mục root của project
 export LOCALSTACK_AUTH_TOKEN=your-token
 docker-compose up -d
+
+# Kiểm tra trạng thái
+docker-compose ps
 ```
 
-### Bước 2: Khởi động Jenkins
+### Bước 2: Verify các containers đang chạy
 ```bash
-cd jenkins
-docker-compose up -d
+# Kiểm tra logs
+docker-compose logs -f localstack
+docker-compose logs -f jenkins
+docker-compose logs -f ansible
 ```
 
 ### Bước 3: Provision Infrastructure với Terraform
@@ -255,11 +307,20 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
-### Bước 6: Cấu hình Jenkins Pipeline
+### Bước 6: Test Ansible
+```bash
+# Test kết nối Ansible
+docker exec ansible-controller ansible --version
+
+# Chạy playbook mẫu (nếu có)
+docker exec ansible-controller ansible-playbook /ansible/playbooks/test.yml
+```
+
+### Bước 7: Cấu hình Jenkins Pipeline
 - Truy cập Jenkins UI: http://localhost:8080
 - Tạo Pipeline job
 - Cấu hình Git webhook
-- Chạy pipeline
+- Pipeline có thể gọi Ansible để orchestrate deployments
 
 ---
 
@@ -282,6 +343,8 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 - [LocalStack Documentation](https://docs.localstack.cloud/)
 - [Terraform LocalStack Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/custom-service-endpoints)
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
+- [Ansible Documentation](https://docs.ansible.com/)
+- [Ansible AWS Collections](https://docs.ansible.com/ansible/latest/collections/amazon/aws/)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
 - [Minikube Guide](https://minikube.sigs.k8s.io/docs/)
 
@@ -293,6 +356,7 @@ Dự án này giúp bạn:
 - ✅ Hiểu rõ quy trình CI/CD end-to-end
 - ✅ Thực hành với Terraform IaC
 - ✅ Làm việc với Jenkins pipeline
+- ✅ Học Ansible cho automation và configuration management
 - ✅ Áp dụng GitOps với ArgoCD
 - ✅ Triển khai ứng dụng lên Kubernetes
 - ✅ Tích hợp security scanning (Trivy)
