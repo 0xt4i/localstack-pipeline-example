@@ -1,6 +1,6 @@
-# 🌐 Hệ thống CI/CD Pipeline GitOps End-to-End với LocalStack
+# 🌐 LocalStack CI/CD Pipeline với Terraform, Jenkins và Ansible
 
-Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container sử dụng **LocalStack** để mô phỏng môi trường AWS. Dự án này sử dụng **Terraform** để khởi tạo hạ tầng AWS (qua LocalStack), **Jenkins** cho continuous integration, **Ansible** cho automation và configuration management, và **ArgoCD** cho GitOps-based deployment lên **Kubernetes** cluster.
+Một hệ thống hạ tầng CI/CD hoàn chỉnh sử dụng **LocalStack** để mô phỏng môi trường AWS. Dự án này sử dụng **Terraform** để khởi tạo hạ tầng AWS (VPC, EKS), **Jenkins** cho continuous integration, và **Ansible** cho automation và configuration management.
 
 > **Lưu ý**: Đây là môi trường **học tập và phát triển** sử dụng LocalStack để mô phỏng các dịch vụ AWS mà không phát sinh chi phí.
 
@@ -16,10 +16,11 @@ Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container s�
 
 ### 1. ☁️ Hạ tầng AWS (Được mô phỏng bởi LocalStack)
 
-- **LocalStack Container**:
-  - Mô phỏng các dịch vụ AWS: S3, ECR, EKS, SNS, SES, IAM, Lambda, API Gateway
+- **LocalStack Pro**:
+  - Mô phỏng các dịch vụ AWS: VPC, EC2, EKS, S3, ECR, SNS, SES, IAM
   - Chạy trên cổng 4566 (Gateway)
   - Hỗ trợ Terraform để provision resources
+  - **EKS với k3d backend**: Tạo Kubernetes cluster thật chạy bên trong Docker
 
 - **Jenkins Container**:
   - Jenkins Master để điều phối CI pipeline
@@ -30,86 +31,37 @@ Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container s�
   - Deploy resources lên LocalStack/AWS
   - Quản lý infrastructure state
 
-- **Các dịch vụ AWS được mô phỏng**:
-  - **S3**: Lưu trữ Terraform state, artifacts
-  - **ECR**: Container registry để lưu Docker images
-  - **SNS/SES**: Gửi thông báo email
-  - **EKS**: Kubernetes cluster (hoặc dùng Minikube/Kind local)
-  - **IAM**: Quản lý permissions và roles
+### 2. 🔧 Các dịch vụ AWS được mô phỏng
 
----
-
-### 2. ⚙️ Quản lý Cấu hình
-
-- **Docker Compose**:
-  - Quản lý lifecycle của LocalStack, Jenkins và Ansible containers
-  - Kết nối các services qua Docker network chung (cicd_network)
-
-- **Terraform**:
-  - Infrastructure as Code để khởi tạo resources trên LocalStack
-  - Quản lý state file
-  - Tự động provision S3 buckets, ECR repos, Lambda functions, etc.
-
-- **Ansible**:
-  - Configuration management và automation tasks
-  - Deploy và configure AWS resources trên LocalStack
-  - Tích hợp với Jenkins pipeline để orchestrate deployments
-
-- **Init Scripts**:
-  - Tự động khởi tạo resources khi LocalStack startup
-  - Setup initial configurations
-
----
-
-### 3. 💻 Môi trường Kubernetes
-
-- **Local Kubernetes Cluster** (Minikube/Kind/K3s):
-  - Thay thế cho EKS thật
-  - Hosting ứng dụng trong namespace riêng
-  - Xử lý deployments qua Kubernetes manifests
-
----
-
-### 4. 🔁 ArgoCD (GitOps Deployment)
-
-- **Các thành phần chính**:
-  - **Application Controller**: Đảm bảo trạng thái app khớp với Git
-  - **Repository Server**: Cache Git manifests
-  - **GitOps Engine**: Thực thi sync operations
-
-- **Quy trình triển khai**:
-  1. Theo dõi GitHub repo để phát hiện thay đổi manifests
-  2. Tự động sync thay đổi lên Kubernetes cluster
-  3. Duy trì trạng thái khai báo từ version control
-
----
-
-### 5. ⚙️ Luồng CI/CD Pipeline
-
-1. **Code push** kích hoạt webhook trong GitHub
-2. **Jenkins**:
-   - Phát hiện thay đổi và lên lịch job
-   - Chạy unit tests
-   - Build Docker image
-   - Scan vulnerabilities với **Trivy**
-   - Push image lên **LocalStack ECR**
-   - Cập nhật Kubernetes manifests với image tag mới
-   - Commit manifest changes về GitHub
-3. **ArgoCD**:
-   - Phát hiện commit mới trong GitHub repo
-   - Sync manifests đã cập nhật lên Kubernetes cluster
-4. **Ứng dụng** được deploy/update tự động trên Kubernetes
+- **VPC**: Virtual Private Cloud với public/private subnets
+- **EKS**: Kubernetes cluster (sử dụng k3d backend)
+- **S3**: Lưu trữ Terraform state, artifacts
+- **ECR**: Container registry để lưu Docker images
+- **SNS/SES**: Gửi thông báo email
+- **IAM**: Quản lý permissions và roles
 
 ---
 
 ## ✅ Yêu cầu Tiên quyết
 
-- Docker & Docker Compose đã cài đặt
-- Git đã cài đặt
-- LocalStack Auth Token (cho LocalStack Pro features)
-- Minikube hoặc Kind (cho local Kubernetes)
-- Terraform CLI
-- Có thể cần: kubectl, helm
+- **Docker & Docker Compose** đã cài đặt ([Hướng dẫn cài đặt](https://docs.docker.com/get-docker/))
+- **Git** đã cài đặt ([Download Git](https://git-scm.com/downloads))
+- **Python 3.8+** cho LocalStack CLI ([Download Python](https://www.python.org/downloads/))
+- **k3d v5.8.3** (cho EKS cluster support) ([Cài đặt k3d](https://k3d.io/#installation))
+- **Terraform CLI v1.0+** ([Download Terraform](https://developer.hashicorp.com/terraform/install))
+- **LocalStack Pro Auth Token** (cho EKS và các Pro features) - Đăng ký tại [app.localstack.cloud](https://app.localstack.cloud)
+- **AWS CLI** (để tương tác với LocalStack) ([Cài đặt AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html))
+
+### Cài đặt k3d
+
+```bash
+# Linux
+wget -q -O /usr/local/bin/k3d https://github.com/k3d-io/k3d/releases/download/v5.8.3/k3d-linux-amd64
+chmod +x /usr/local/bin/k3d
+
+# Verify
+k3d version
+```
 
 ---
 
@@ -117,236 +69,455 @@ Một hệ thống hạ tầng CI/CD hoàn chỉnh cho ứng dụng container s�
 
 ```bash
 .
-├── docker-compose.yaml      # Docker Compose gộp chung: LocalStack, Jenkins, Ansible
-├── localstack/              # LocalStack configuration và init scripts
-│   ├── init-resources.sh    # Script khởi tạo resources
-│   ├── lambda-functions/    # Lambda function code
-│   └── volume/              # LocalStack persistent data
-├── jenkins/                 # Jenkins docker setup
-│   ├── Dockerfile           # Custom Jenkins image với tools
-│   └── ...                  # Jenkins configurations
-├── ansible/                 # Ansible automation
-│   ├── Dockerfile           # Ansible controller image
-│   ├── ansible.cfg          # Ansible configuration
-│   ├── playbooks/           # Ansible playbooks
-│   ├── inventory/           # Inventory files (hosts)
-│   └── roles/               # Ansible roles
-├── terraform/               # Terraform modules & scripts
-│   ├── aws/                 # AWS resources configuration
-│   ├── deploy.sh            # Deploy script
-│   └── destroy.sh           # Cleanup script
-└── README.md                # File documentation chính
+├── deploy.sh                     # Script deployment chính (wrapper)
+├── start-localstack.sh           # Script khởi động LocalStack với k3d support
+├── docker-compose.yaml           # Docker Compose: Jenkins, Ansible
+├── jenkins/                      # Jenkins docker setup
+│   ├── Dockerfile                # Custom Jenkins image với tools
+│   └── ...
+├── ansible/                      # Ansible automation
+│   ├── Dockerfile                # Ansible controller image
+│   ├── ansible.cfg               # Ansible configuration
+│   ├── playbooks/                # Ansible playbooks
+│   ├── inventory/                # Inventory files
+│   └── roles/                    # Ansible roles
+├── terraform/                    # Terraform infrastructure
+│   └── aws/
+│       ├── main.tf               # Main Terraform config
+│       ├── providers.tf          # AWS provider config (LocalStack endpoints)
+│       ├── variables.tf          # Input variables
+│       ├── outputs.tf            # Output values
+│       ├── modules/
+│       │   ├── vpc/              # VPC module
+│       │   └── eks/              # EKS module
+│       ├── env/
+│       │   ├── common.tfvars     # Common variables
+│       │   ├── dev.tfvars        # Dev environment
+│       │   └── prod.tfvars       # Prod environment
+│       └── script/
+│           └── deploy.sh         # Terraform deployment script
+└── README.md                     # File documentation chính
 ```
 
 ---
 
-## 🧱 Các Thành phần Dự án
+## 🚀 Hướng dẫn Triển khai Nhanh
 
-### 🚀 LocalStack (Mô phỏng AWS Services)
+### Bước 1: Cấu hình Environment Variables
 
-Mô phỏng các dịch vụ AWS:
-- S3 buckets cho artifacts và Terraform state
-- ECR repositories cho Docker images
-- Lambda functions
-- SNS topics cho notifications
-- IAM roles và policies
-
-**Cách khởi động**:
 ```bash
-# Chạy tất cả services từ root
+# Set LocalStack auth token (lấy từ https://app.localstack.cloud)
 export LOCALSTACK_AUTH_TOKEN=your-token-here
-docker-compose up -d
+
+# Tùy chọn: Enable persistence
+export PERSISTENCE=0
+export DEBUG=0
 ```
 
----
+### Bước 2: Khởi động tất cả services với Docker Compose
 
-### 🤖 Ansible (Automation & Configuration Management)
-
-**Mục đích**:
-- Tự động hóa deployment resources lên LocalStack/AWS
-- Configuration management cho infrastructure
-- Orchestration tasks trong CI/CD pipeline
-
-**Cấu trúc**:
-- **Inventory**: Định nghĩa các target hosts (localhost, LocalStack)
-- **Playbooks**: Kịch bản automation (YAML format)
-- **Roles**: Tái sử dụng logic cho các tasks phổ biến
-
-**Ví dụ sử dụng**:
 ```bash
-# Chạy playbook từ Ansible container
-docker exec ansible-controller ansible-playbook \
-  -i /ansible/inventory/hosts \
-  /ansible/playbooks/deploy-to-localstack.yml
-
-# Hoặc từ Jenkins pipeline
-docker exec ansible-controller ansible-playbook /ansible/playbooks/setup.yml
-```
-
-**Tính năng chính**:
-- ✅ Deploy AWS resources (S3, Lambda, DynamoDB) lên LocalStack
-- ✅ Configure applications và services
-- ✅ Idempotent operations (chạy nhiều lần không gây lỗi)
-- ✅ Tích hợp với Jenkins pipeline
-
----
-
-### 🏗️ Terraform (Infrastructure as Code)
-
-Tự động khởi tạo:
-- S3 buckets trên LocalStack
-- ECR repositories
-- Lambda functions
-- SNS topics cho email alerts
-- IAM roles và policies
-
-**Cách sử dụng**:
-```bash
-cd terraform
-# Cấu hình endpoint trỏ về LocalStack
-terraform init
-terraform plan
-terraform apply
-```
-
----
-
-### 🛠️ Jenkins (CI/CD Pipeline)
-
-Bao gồm:
-- Pipeline stages:
-  - Checkout Code
-  - Build & Push Docker Image
-  - Security Scan (Trivy)
-  - Push to LocalStack ECR
-  - Update Kubernetes manifests
-
-**Cách khởi động**:
-```bash
-cd jenkins
-docker-compose up -d
-# Truy cập: http://localhost:8080
-```
-
----
-
-### 🐳 Docker (Application Containerization)
-
-- Ứng dụng mẫu (Flask/Node.js/Java)
-- Dockerfile tối ưu với multi-stage build
-- Push images lên LocalStack ECR thay vì Docker Hub
-
----
-
-### ☸️ Kubernetes (Container Orchestration)
-
-- Deployment và Service manifests
-- Namespace configuration
-- Manifests tự động cập nhật qua Jenkins pipeline
-
-**Setup local K8s**:
-```bash
-# Sử dụng Minikube
-minikube start
-
-# Hoặc Kind
-kind create cluster --name cicd-demo
-```
-
----
-
-### 🚀 ArgoCD (GitOps Continuous Deployment)
-
-- Tự động sync manifests từ GitHub
-- Deploy ứng dụng lên local Kubernetes cluster
-
-**Cài đặt ArgoCD**:
-```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-```
-
----
-
-## 🚀 Hướng dẫn Triển khai
-
-### Bước 1: Khởi động tất cả services (LocalStack, Jenkins, Ansible)
-```bash
-# Từ thư mục root của project
-export LOCALSTACK_AUTH_TOKEN=your-token
+# Start LocalStack, Jenkins, Ansible
 docker-compose up -d
 
-# Kiểm tra trạng thái
+# Kiểm tra containers
 docker-compose ps
+
+# Xem logs
+docker logs -f localstack-main
 ```
 
-### Bước 2: Verify các containers đang chạy
+Docker Compose sẽ tự động:
+- ✅ Tạo shared network `localstack-net` (bridge driver)
+- ✅ Khởi động LocalStack Pro trên port 4566
+- ✅ Khởi động Jenkins trên port 8080
+- ✅ Khởi động Ansible controller
+- ✅ Cấu hình DNS resolution giữa các services (localstack, jenkins, ansible)
+
+**Lưu ý quan trọng**:
+- LocalStack container có k3d binary được mount qua Docker socket
+- Tất cả services giao tiếp qua shared network `localstack-net`
+- Jenkins và Ansible truy cập LocalStack qua `http://localstack:4566`
+
+### Bước 3: Verify Services
+
+```bash
+# Kiểm tra LocalStack health
+curl http://localhost:4566/_localstack/health
+
+# Truy cập Jenkins UI
+open http://localhost:8080  # Lấy initial admin password từ: docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+
+# Test kết nối từ Jenkins đến LocalStack
+docker exec jenkins curl http://localstack:4566/_localstack/health
+
+# Test kết nối từ Ansible đến LocalStack
+docker exec ansible curl http://localstack:4566/_localstack/health
+```
+
+### Bước 4: Deploy Infrastructure với Terraform
+
+**Cách 1: Sử dụng script deploy.sh (Khuyến nghị)**
+
+```bash
+# Deploy hoàn chỉnh (init + plan + apply)
+./deploy.sh dev all
+
+# Deploy với auto-approve (không cần xác nhận)
+./deploy.sh dev all --auto-approve
+
+# Chỉ plan
+./deploy.sh dev plan
+
+# Chỉ apply
+./deploy.sh dev apply
+
+# Destroy infrastructure
+./deploy.sh dev destroy --auto-approve
+```
+
+**Cách 2: Sử dụng Terraform trực tiếp**
+
+```bash
+cd terraform/aws
+
+# Initialize
+terraform init
+
+# Plan
+terraform plan \
+  -var-file=env/common.tfvars \
+  -var-file=env/dev.tfvars
+
+# Apply (tạo VPC trước)
+terraform apply \
+  -var-file=env/common.tfvars \
+  -var-file=env/dev.tfvars \
+  -target=module.vpc
+
+# Apply (tạo EKS cluster - mất 3-5 phút)
+terraform apply \
+  -var-file=env/common.tfvars \
+  -var-file=env/dev.tfvars
+```
+
+### Bước 5: Verify Infrastructure
+
+```bash
+# List VPC
+aws ec2 describe-vpcs --endpoint-url=http://localhost:4566
+
+# List EKS clusters
+aws eks list-clusters --endpoint-url=http://localhost:4566 --region ap-southeast-1
+
+# Describe EKS cluster
+aws eks describe-cluster \
+  --name project_1-dev-eks \
+  --endpoint-url=http://localhost:4566 \
+  --region ap-southeast-1
+
+# List k3d clusters (nếu EKS đã tạo)
+k3d cluster list
+
+# Lấy kubeconfig và verify
+aws eks update-kubeconfig \
+  --name project_1-dev-eks \
+  --endpoint-url=http://localhost:4566 \
+  --region ap-southeast-1
+
+kubectl get nodes
+```
+
+---
+
+## 🛠️ Các Scripts Tiện ích
+
+### deploy.sh - Main Deployment Script
+
+Script wrapper chính để deploy infrastructure:
+
+```bash
+# Syntax
+./deploy.sh [ENVIRONMENT] [ACTION] [OPTIONS]
+
+# Examples
+./deploy.sh dev all                    # Deploy dev environment (init + plan + apply)
+./deploy.sh dev all --auto-approve     # Deploy dev với auto-approve
+./deploy.sh prod plan                  # Plan prod environment
+./deploy.sh dev apply --auto-approve   # Apply dev changes
+./deploy.sh dev destroy --auto-approve # Destroy dev infrastructure
+./deploy.sh dev validate --skip-checks # Validate config only
+```
+
+**Tính năng:**
+- ✅ Kiểm tra LocalStack đang chạy (qua Docker Compose)
+- ✅ Kiểm tra Docker services (Jenkins, Ansible)
+- ✅ Hỗ trợ command `all` để chạy pipeline hoàn chỉnh
+- ✅ Auto-approve mode
+- ✅ Skip checks mode
+
+### start-localstack.sh - Legacy Script (Tùy chọn)
+
+Script khởi động LocalStack CLI (alternative approach):
+
+```bash
+./start-localstack.sh
+```
+
+**Lưu ý**: Script này dùng LocalStack CLI thay vì Docker Compose. Khuyến nghị sử dụng Docker Compose (`docker-compose up -d`) cho deployment chính thức.
+
+---
+
+## 🧩 Các Module Terraform
+
+### VPC Module
+
+Tạo Virtual Private Cloud với:
+- 1 VPC với CIDR 10.0.0.0/16
+- 2 Public subnets (10.0.1.0/24, 10.0.2.0/24)
+- 2 Private subnets (10.0.3.0/24, 10.0.4.0/24)
+- Internet Gateway
+- Route tables
+
+**File:** [terraform/aws/modules/vpc/main.tf](terraform/aws/modules/vpc/main.tf)
+
+### EKS Module
+
+Tạo Elastic Kubernetes Service cluster với:
+- Kubernetes version 1.28
+- Cluster name: project_1-{env}-eks
+- Security groups cho cluster và nodes
+- KMS encryption
+- CloudWatch logging
+
+**File:** [terraform/aws/modules/eks/main.tf](terraform/aws/modules/eks/main.tf)
+
+> **Lưu ý**: EKS cluster sử dụng k3d backend của LocalStack, tạo Kubernetes cluster thật chạy trong Docker containers.
+
+---
+
+## 🐳 Docker Compose Services
+
+### LocalStack
+
+- **Image:** localstack/localstack-pro
+- **Container name:** localstack-main
+- **Ports:**
+  - 4566 (Gateway API)
+  - 4510-4559 (External services)
+  - 443 (HTTPS)
+- **Volumes:**
+  - `./volume:/var/lib/localstack` (Data persistence)
+  - `/var/run/docker.sock:/var/run/docker.sock` (Docker socket cho k3d)
+- **Network:** localstack-net (bridge)
+- **Environment:**
+  - LOCALSTACK_AUTH_TOKEN (required)
+  - DEBUG, PERSISTENCE (optional)
+
+### Jenkins
+
+- **Image:** jenkins-jdk-17 (custom build)
+- **Container name:** jenkins
+- **Ports:** 8080 (UI), 50000 (agent)
+- **Volumes:** jenkins_home, Docker socket
+- **Network:** localstack-net (bridge)
+- **Environment:** LOCALSTACK_ENDPOINT=http://localstack:4566
+
+### Ansible
+
+- **Image:** ansible-controller (custom build)
+- **Container name:** ansible
+- **Volumes:** playbooks, inventory, roles
+- **Network:** localstack-net (bridge)
+- **Environment:**
+  - LOCALSTACK_ENDPOINT=http://localstack:4566
+  - AWS_ENDPOINT_URL=http://localstack:4566
+- **Command:** tail -f /dev/null (keep alive)
+
+**Giao tiếp giữa các services:**
+- Tất cả services cùng network `localstack-net` → DNS resolution tự động
+- Jenkins → LocalStack: `http://localstack:4566`
+- Ansible → LocalStack: `http://localstack:4566`
+- Host → LocalStack: `http://localhost:4566`
+
+---
+
+## 🔧 Cấu hình Terraform
+
+### Providers
+
+Terraform được cấu hình để sử dụng LocalStack endpoints:
+
+```hcl
+provider "aws" {
+  region                      = "ap-southeast-1"
+  access_key                  = "test"
+  secret_key                  = "test"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+
+  endpoints {
+    ec2  = "http://localhost:4566"
+    eks  = "http://localhost:4566"
+    # ... other services
+  }
+}
+```
+
+### Variables
+
+**Common variables** ([terraform/aws/env/common.tfvars](terraform/aws/env/common.tfvars)):
+- vpc_cidr = "10.0.0.0/16"
+- project = "project_1"
+- region = "ap-southeast-1"
+- public_subnet_cidrs, private_subnet_cidrs
+- public_subnet_azs, private_subnet_azs
+
+**Environment-specific** ([terraform/aws/env/dev.tfvars](terraform/aws/env/dev.tfvars)):
+- env = "dev"
+
+---
+
+## 🐛 Xử lý Sự cố
+
+### LocalStack license activation failed
+
+**Lỗi:**
+```
+License activation failed! 🔑❌
+Reason: The credentials defined in your environment are invalid.
+```
+
+**Giải pháp:**
+1. Kiểm tra auth token:
+   ```bash
+   echo $LOCALSTACK_AUTH_TOKEN
+   ```
+
+2. Lấy token mới từ https://app.localstack.cloud
+
+3. Set lại environment variable:
+   ```bash
+   export LOCALSTACK_AUTH_TOKEN=your-new-token
+   ```
+
+4. Khởi động lại LocalStack:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+### EKS cluster creation failed - k3d not found
+
+**Lỗi trong logs:**
+```
+Error starting K3D cluster: Installation of k3d v5.8.3 failed.
+```
+
+**Nguyên nhân:** LocalStack container không thể download k3d từ GitHub do rate limit hoặc network issues.
+
+**Giải pháp 1 - Kiểm tra k3d binary:**
+```bash
+# Verify k3d được mount vào LocalStack container
+docker exec localstack-main which k3d
+docker exec localstack-main k3d version
+
+# Nếu không có, restart Docker Compose
+docker-compose restart localstack
+```
+
+**Giải pháp 2 - GitHub API Rate Limit:**
+
+Xem phần [Known Issues & Workarounds](#%EF%B8%8F-known-issues--workarounds) để biết chi tiết về GitHub API rate limit và cách xử lý.
+
+### Terraform state mismatch
+
+**Lỗi:** Resources tồn tại trong state nhưng không có trên LocalStack.
+
+**Giải pháp:**
+```bash
+# Clean state và deploy lại
+cd terraform/aws
+rm -rf .terraform.lock.hcl terraform.tfstate*
+terraform init
+./deploy.sh dev all --auto-approve
+```
+
+### LocalStack không khởi động
+
 ```bash
 # Kiểm tra logs
-docker-compose logs -f localstack
-docker-compose logs -f jenkins
-docker-compose logs -f ansible
+docker logs localstack-main
+
+# Kiểm tra containers
+docker-compose ps
+
+# Kiểm tra port
+lsof -i :4566
+
+# Restart
+docker-compose restart localstack
+
+# Hoặc rebuild
+docker-compose down
+docker-compose up -d --build
 ```
 
-### Bước 3: Provision Infrastructure với Terraform
+### Jenkins không kết nối LocalStack
+
 ```bash
-cd terraform
-terraform init
-terraform apply -auto-approve
+# Kiểm tra endpoint từ Jenkins container (sử dụng service name)
+docker exec jenkins curl http://localstack:4566/_localstack/health
+
+# Kiểm tra network
+docker network inspect localstack-net
+
+# Verify cả hai containers cùng network
+docker inspect jenkins | grep -A 10 Networks
+docker inspect localstack-main | grep -A 10 Networks
 ```
 
-### Bước 4: Setup Local Kubernetes
+---
+
+## 📊 Outputs
+
+Sau khi deploy thành công, bạn có thể xem outputs:
+
 ```bash
-minikube start
-kubectl create namespace demo-app
+cd terraform/aws
+terraform output
+
+# Hoặc
+terraform output vpc_id
+terraform output eks_cluster_name
+terraform output eks_cluster_endpoint
 ```
-
-### Bước 5: Cài đặt ArgoCD
-```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-```
-
-### Bước 6: Test Ansible
-```bash
-# Test kết nối Ansible
-docker exec ansible-controller ansible --version
-
-# Chạy playbook mẫu (nếu có)
-docker exec ansible-controller ansible-playbook /ansible/playbooks/test.yml
-```
-
-### Bước 7: Cấu hình Jenkins Pipeline
-- Truy cập Jenkins UI: http://localhost:8080
-- Tạo Pipeline job
-- Cấu hình Git webhook
-- Pipeline có thể gọi Ansible để orchestrate deployments
 
 ---
 
 ## 🎯 Điểm khác biệt với AWS Production
 
-| Thành phần | AWS Production | LocalStack (Học tập) |
-|-----------|----------------|---------------------|
+| Thành phần | AWS Production | LocalStack |
+|-----------|----------------|------------|
 | **Compute** | EC2 Instances | Docker Containers |
+| **Kubernetes** | EKS (managed) | k3d (local k3s) |
 | **Container Registry** | ECR | LocalStack ECR |
-| **Kubernetes** | EKS | Minikube/Kind |
+| **Networking** | VPC, Subnets, NAT | Mô phỏng qua LocalStack |
 | **Storage** | S3 | LocalStack S3 |
-| **Notifications** | SNS/SES | LocalStack SNS/SES |
 | **Chi phí** | Có phát sinh | **Miễn phí** |
-| **Networking** | VPC, Subnets | Docker Networks |
+| **Performance** | Production-grade | Development-grade |
 
 ---
 
 ## 📚 Tài liệu Tham khảo
 
 - [LocalStack Documentation](https://docs.localstack.cloud/)
-- [Terraform LocalStack Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/custom-service-endpoints)
+- [LocalStack EKS Support](https://docs.localstack.cloud/user-guide/aws/elastic-kubernetes-service/)
+- [k3d Documentation](https://k3d.io/)
+- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
 - [Ansible Documentation](https://docs.ansible.com/)
 - [Ansible AWS Collections](https://docs.ansible.com/ansible/latest/collections/amazon/aws/)
-- [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
-- [Minikube Guide](https://minikube.sigs.k8s.io/docs/)
 
 ---
 
@@ -354,48 +525,169 @@ docker exec ansible-controller ansible-playbook /ansible/playbooks/test.yml
 
 Dự án này giúp bạn:
 - ✅ Hiểu rõ quy trình CI/CD end-to-end
-- ✅ Thực hành với Terraform IaC
-- ✅ Làm việc với Jenkins pipeline
-- ✅ Học Ansible cho automation và configuration management
-- ✅ Áp dụng GitOps với ArgoCD
-- ✅ Triển khai ứng dụng lên Kubernetes
-- ✅ Tích hợp security scanning (Trivy)
+- ✅ Thực hành Terraform Infrastructure as Code
+- ✅ Làm việc với AWS services qua LocalStack
+- ✅ Deploy EKS cluster với k3d
+- ✅ Tích hợp Jenkins pipeline
+- ✅ Sử dụng Ansible cho automation
+- ✅ Quản lý multi-environment infrastructure (dev/prod)
 - ✅ **Không mất chi phí AWS**
 
 ---
 
-## 🐛 Xử lý Sự cố
+## 🔄 Workflow CI/CD
 
-### LocalStack không khởi động
+1. **Developer** push code lên GitHub
+2. **GitHub Webhook** trigger Jenkins job
+3. **Jenkins** chạy pipeline:
+   - Checkout code
+   - Build Docker image
+   - Security scan (Trivy)
+   - Push lên LocalStack ECR
+   - Trigger Ansible playbook
+4. **Ansible** deploy infrastructure/application:
+   - Provision resources qua Terraform
+   - Configure services
+   - Deploy application lên EKS
+5. **Kubernetes (k3d)** chạy application
+
+---
+
+## 🧹 Cleanup
+
 ```bash
-# Kiểm tra logs
-docker logs localstack
+# Destroy Terraform infrastructure
+./deploy.sh dev destroy --auto-approve
 
-# Kiểm tra auth token
-echo $LOCALSTACK_AUTH_TOKEN
-```
+# Stop LocalStack
+source localstack/bin/activate
+localstack stop
 
-### Terraform không kết nối được LocalStack
-```bash
-# Đảm bảo endpoint configuration
-export AWS_ENDPOINT_URL=http://localhost:4566
-```
+# Stop Docker services
+docker-compose down
 
-### Jenkins không push được lên ECR
-```bash
-# Login vào LocalStack ECR
-aws --endpoint-url=http://localhost:4566 ecr get-login-password | docker login --username AWS --password-stdin localhost:4566
+# Remove k3d clusters (nếu có)
+k3d cluster list
+k3d cluster delete <cluster-name>
+
+# Deactivate venv
+deactivate
 ```
 
 ---
 
-## Tác giả
+## ⚠️ Known Issues & Workarounds
+
+### 1. GitHub API Rate Limit với k3d Download (CRITICAL)
+
+**Vấn đề**: LocalStack Pro EKS không thể tạo cluster do GitHub API rate limit khi validate k3d version.
+
+**Triệu chứng**:
+```
+Error starting K3D cluster: Could not get list of releases from https://api.github.com/repos/rancher/k3d/releases/tags/v5.8.3:
+{"message":"API rate limit exceeded for x.x.x.x. (But here's the good news: Authenticated requests get a higher rate limit..."}
+```
+
+Hoặc (trên WSL2):
+```
+Error starting K3D cluster: Installation of k3d v5.8.3 failed.
+```
+
+**Root cause**:
+- LocalStack **luôn kiểm tra** GitHub API `/repos/rancher/k3d/releases/tags/v5.8.3` trước khi sử dụng k3d binary
+- GitHub API rate limit cho unauthenticated requests: **60 requests/hour per IP**
+- Trong môi trường WSL2/Docker, nhiều services có thể share cùng public IP → exhaust rate limit rất nhanh
+- LocalStack **không có** environment variable để bypass GitHub check hoặc sử dụng authenticated requests ([Issue #7148](https://github.com/localstack/localstack/issues/7148))
+
+**Workarounds đã test (KHÔNG hiệu quả)**:
+- ❌ Mount k3d binary vào `/usr/local/bin/`: LocalStack vẫn check GitHub API
+- ❌ Copy k3d vào `/var/lib/localstack/lib/k3d/v5.8.3/`: LocalStack vẫn check GitHub API trước
+- ❌ MTU adjustments (1400, 1350): Không fix GitHub API issue
+- ❌ Disable SSL verification: Không bypass rate limit
+
+**Giải pháp khả thi**:
+
+**Option 1: Chờ GitHub API rate limit reset (RECOMMENDED cho testing)**
+```bash
+# Check khi nào rate limit reset
+curl -I https://api.github.com/repos/rancher/k3d/releases/tags/v5.8.3 2>&1 | grep -i "x-ratelimit"
+
+# Đợi 1 giờ rồi thử lại
+./deploy.sh dev all --auto-approve
+```
+
+**Option 2: Custom LocalStack Docker Image (RECOMMENDED cho production)**
+
+Tạo image với k3d pre-installed và mock GitHub API response:
+```dockerfile
+# Dockerfile.localstack-eks
+FROM localstack/localstack-pro:4.12.1
+
+# Pre-install k3d binary vào internal directory
+RUN mkdir -p /var/lib/localstack/lib/k3d/v5.8.3 && \
+    wget -q -O /var/lib/localstack/lib/k3d/v5.8.3/k3d \
+        https://github.com/k3d-io/k3d/releases/download/v5.8.3/k3d-linux-amd64 && \
+    chmod +x /var/lib/localstack/lib/k3d/v5.8.3/k3d
+
+# Note: LocalStack sẽ vẫn cố check GitHub API nhưng nếu fail sẽ fallback
+# về binary đã có sẵn (behavior có thể thay đổi theo version)
+```
+
+Build và sử dụng:
+```bash
+docker build -t localstack-eks:latest -f Dockerfile.localstack-eks .
+
+# Update start-localstack.sh để sử dụng custom image
+# Thay vì: localstack start -d
+# Sử dụng: docker run với custom image
+```
+
+**Option 3: Sử dụng GitHub Personal Access Token (experimental)**
+
+LocalStack chưa official support nhưng có thể thử:
+```bash
+export GITHUB_TOKEN="ghp_your_token_here"
+export DOCKER_FLAGS="... -e GITHUB_TOKEN=$GITHUB_TOKEN"
+./start-localstack.sh
+```
+
+**Tham khảo**:
+- [LocalStack Issue #7148 - GitHub API Rate Limit](https://github.com/localstack/localstack/issues/7148)
+- [LocalStack Issue #6797 - Container CI Error](https://github.com/localstack/localstack/issues/6797)
+- [LocalStack EKS Documentation](https://docs.localstack.cloud/aws/services/eks/)
+
+### 2. LocalStack Data Persistence
+
+**Vấn đề**: Khi restart LocalStack, tất cả resources (VPC, EKS clusters) bị mất.
+
+**Giải pháp**:
+- Destroy terraform state trước khi restart: `./deploy.sh dev destroy --auto-approve`
+- Hoặc enable LocalStack persistence (Pro feature):
+  ```bash
+  export PERSISTENCE=1
+  ./start-localstack.sh
+  ```
+
+### 3. Terraform State Mismatch
+
+**Vấn đề**: Terraform state có resources cũ mà LocalStack không còn.
+
+**Giải pháp**:
+```bash
+cd terraform/aws
+rm terraform.tfstate*
+./deploy.sh dev all --auto-approve
+```
+
+---
+
+## 👥 Tác giả
 
 **Tai Huu Nguyen** - DevOps Engineer
 
 ## 📬 Liên hệ
 
-- 📧 Email huutai.network@gmail.com
+- 📧 Email: huutai.network@gmail.com
 - GitHub: [0xt4i](https://github.com/0xt4i)
 
 ---
@@ -411,7 +703,7 @@ MIT License - Dự án học tập, free to use
 Dự án này được phát triển dựa trên kiến trúc từ:
 - **Original Project**: [CloudDevOpsProject](https://github.com/Sherif127/CloudDevOpsProject)
 - **Author**: Sherif Shaban
-- **Adaptation**: Điều chỉnh để chạy trên LocalStack thay vì AWS thật, phục vụ mục đích học tập
+- **Adaptation**: Điều chỉnh để chạy trên LocalStack thay vì AWS thật, bổ sung k3d support cho EKS, phục vụ mục đích học tập
 
 ---
 
