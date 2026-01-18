@@ -1,3 +1,22 @@
+### 4. Lỗi treo khi tạo node EKS với Terraform (LocalStack)
+
+**Vấn đề**: Khi sử dụng resource `aws_instance` (EC2) để tạo worker node cho EKS trong LocalStack, quá trình apply sẽ bị treo mãi ở bước tạo instance (do LocalStack chỉ mô phỏng API EC2, không tạo VM thật).
+
+**Triệu chứng**:
+```
+module.eks_nodes.aws_instance.worker_nodes[0]: Still creating... [05m30s elapsed]
+module.eks_nodes.aws_instance.ansible_controller: Still creating... [05m40s elapsed]
+... (tiếp tục treo)
+```
+
+**Nguyên nhân**: LocalStack không hỗ trợ tạo EC2 instance thật, chỉ mô phỏng API. Terraform sẽ chờ mãi không xong.
+
+**Giải pháp**:
+- Không sử dụng resource `aws_instance` cho worker node khi chạy với LocalStack.
+- Thay vào đó, chỉ sử dụng resource `aws_eks_node_group` để mô phỏng nodegroup (giống như dùng lệnh `awslocal eks create-nodegroup`).
+- Nếu module cũ có aws_instance, hãy comment/xóa các resource này để tránh treo apply/destroy.
+
+**Tham khảo thêm**: Xem phần hướng dẫn sửa module EKS trong README này.
 # 🌐 LocalStack CI/CD Pipeline với Terraform, Jenkins và Ansible
 
 Một hệ thống hạ tầng CI/CD hoàn chỉnh sử dụng **LocalStack** để mô phỏng môi trường AWS. Dự án này sử dụng **Terraform** để khởi tạo hạ tầng AWS (VPC, EKS), **Jenkins** cho continuous integration, và **Ansible** cho automation và configuration management.
@@ -135,7 +154,7 @@ Docker Compose sẽ tự động:
 - ✅ Cấu hình DNS resolution giữa các services (localstack, jenkins, ansible)
 
 **Lưu ý quan trọng**:
-- LocalStack container có k3d binary được mount qua Docker socket
+- LocalStack container có k3d binary được mount [text](volume/lib)qua Docker socket
 - Tất cả services giao tiếp qua shared network `localstack-net`
 - Jenkins và Ansible truy cập LocalStack qua `http://localstack:4566`
 

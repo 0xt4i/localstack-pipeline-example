@@ -14,8 +14,9 @@ module "eks" {
   vpc_id     = var.vpc_id
   subnet_ids = var.subnet_ids
 
-  # For LocalStack with Kind backend, worker nodes are managed by Kind
-  # No need to create managed node groups explicitly
+  # Disable managed node groups for LocalStack (not fully supported)
+  # Nodes would need to be created separately or via ECS/Fargate
+  eks_managed_node_groups = {}
 
   tags = {
     Environment = var.env

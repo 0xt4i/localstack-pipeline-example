@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+    environment {
+        LOCALSTACK_ENDPOINT = 'http://localstack:4566'
+        AWS_ACCESS_KEY_ID = 'test'
+        AWS_SECRET_ACCESS_KEY = 'test'
+        AWS_DEFAULT_REGION = 'ap-southeast-1'
+        ECR_REPO = 'frontend-ecr'
+        IMAGE_TAG = "frontend:latest"
+        DOCKERHUB_USER = '0xt4i'
+        DOCKERHUB_REPO = 'frontend'
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/DevSecPipeline/frontend'
+            }
+        }
+        stage('Build Frontend') {
+            steps {
+                sh 'npm install'
+                sh 'npm run build'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $IMAGE_TAG .'
+            }
+        }
+        stage('Push to LocalStack ECR') {
+            steps {
+                sh '''
+                aws --endpoint-url=$LOCALSTACK_ENDPOINT ecr create-repository --repository-name $ECR_REPO || true
+                aws --endpoint-url=$LOCALSTACK_ENDPOINT ecr get-login-password | docker login --username AWS --password-stdin localhost:4566/$ECR_REPO
+                docker tag $IMAGE_TAG localhost:4566/$ECR_REPO:latest
+                docker push localhost:4566/$ECR_REPO:latest
+                '''
+            }
+        }
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-0xt4i', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                    sh '''
+                    docker tag $IMAGE_TAG $DOCKERHUB_USER/$DOCKERHUB_REPO:latest
+                    echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+                    docker push $DOCKERHUB_USER/$DOCKERHUB_REPO:latest
+                    '''
+                }
+            }
+        }
+        stage('Deploy to EKS (k3d) with Ansible') {
+            steps {
+                sh 'ansible-playbook ansible/playbooks/deploy_frontend_eks.yaml'
+            }
+        }
+    }
+    post {
+        success {
+            echo 'Frontend deployed to EKS (k3d) via LocalStack!'
+        }
+        failure {
+            echo 'Deployment failed!'
+        }
+    }
+}

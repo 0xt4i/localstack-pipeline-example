@@ -56,17 +56,12 @@ check_k3d() {
 
 # Parse command line arguments
 ENVIRONMENT="dev"
-ACTION="apply"
 AUTO_APPROVE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -e|--env)
             ENVIRONMENT="$2"
-            shift 2
-            ;;
-        -a|--action)
-            ACTION="$2"
             shift 2
             ;;
         --auto-approve)
@@ -78,14 +73,13 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  -e, --env ENV          Environment (dev|prod) [default: dev]"
-            echo "  -a, --action ACTION    Terraform action (init|plan|apply|destroy) [default: apply]"
-            echo "  --auto-approve         Auto approve terraform apply/destroy"
+            echo "  --auto-approve         Auto approve terraform apply"
             echo "  -h, --help             Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0                                    # Apply dev environment"
-            echo "  $0 -e prod -a plan                    # Plan prod environment"
-            echo "  $0 -a destroy --auto-approve          # Destroy dev with auto-approve"
+            echo "  $0                          # Deploy dev environment"
+            echo "  $0 -e prod                  # Deploy prod environment"
+            echo "  $0 --auto-approve           # Deploy with auto-approve"
             exit 0
             ;;
         *)
@@ -105,89 +99,50 @@ fi
 cd "$TERRAFORM_DIR"
 
 log_info "Environment: $ENVIRONMENT"
-log_info "Action: $ACTION"
 log_info "Working directory: $TERRAFORM_DIR"
 echo ""
 
-# Perform action
-case $ACTION in
-    init)
-        log_info "Initializing Terraform..."
-        terraform init
-        ;;
+# Check prerequisites
+check_localstack
+check_k3d
 
-    plan)
-        check_localstack
-        log_info "Planning Terraform deployment..."
-        terraform plan \
-            -var-file=env/common.tfvars \
-            -var-file=env/${ENVIRONMENT}.tfvars
-        ;;
+log_info "Applying Terraform configuration..."
 
-    apply)
-        check_localstack
-        check_k3d
-        log_info "Applying Terraform configuration..."
+# First create VPC
+log_info "Step 1/2: Creating VPC infrastructure..."
+terraform apply \
+    -var-file=env/common.tfvars \
+    -var-file=env/${ENVIRONMENT}.tfvars \
+    -target=module.vpc \
+    $AUTO_APPROVE
 
-        # First create VPC
-        log_info "Step 1/2: Creating VPC infrastructure..."
-        terraform apply \
-            -var-file=env/common.tfvars \
-            -var-file=env/${ENVIRONMENT}.tfvars \
-            -target=module.vpc \
-            $AUTO_APPROVE
+# Then create EKS (if not auto-approve, ask user)
+if [ -z "$AUTO_APPROVE" ]; then
+    echo ""
+    read -p "Do you want to create EKS cluster? (y/n) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Skipping EKS cluster creation"
+        exit 0
+    fi
+fi
 
-        # Then create EKS (if not auto-approve, ask user)
-        if [ -z "$AUTO_APPROVE" ]; then
-            echo ""
-            read -p "Do you want to create EKS cluster? (y/n) " -n 1 -r
-            echo ""
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                log_info "Skipping EKS cluster creation"
-                exit 0
-            fi
-        fi
-
-        log_info "Step 2/2: Creating EKS cluster (this may take 3-5 minutes)..."
-        terraform apply \
-            -var-file=env/common.tfvars \
-            -var-file=env/${ENVIRONMENT}.tfvars \
-            $AUTO_APPROVE
-        ;;
-
-    destroy)
-        log_warn "This will destroy all infrastructure!"
-        terraform destroy \
-            -var-file=env/common.tfvars \
-            -var-file=env/${ENVIRONMENT}.tfvars \
-            $AUTO_APPROVE
-        ;;
-
-    validate)
-        log_info "Validating Terraform configuration..."
-        terraform validate
-        ;;
-
-    *)
-        log_error "Unknown action: $ACTION"
-        log_info "Valid actions: init, plan, apply, destroy, validate"
-        exit 1
-        ;;
-esac
+log_info "Step 2/2: Creating EKS cluster (this may take 3-5 minutes)..."
+terraform apply \
+    -var-file=env/common.tfvars \
+    -var-file=env/${ENVIRONMENT}.tfvars \
+    $AUTO_APPROVE
 
 # Success message
 if [ $? -eq 0 ]; then
     echo ""
-    log_info "Terraform $ACTION completed successfully! ✓"
-
-    if [ "$ACTION" == "apply" ]; then
-        echo ""
-        log_info "Next steps:"
-        echo "  - Check resources: terraform show"
-        echo "  - Get outputs: terraform output"
-        echo "  - Verify EKS: aws eks describe-cluster --name project_1-${ENVIRONMENT}-eks --endpoint-url=http://localhost:4566"
-    fi
+    log_info "Terraform deployment completed successfully! ✓"
+    echo ""
+    log_info "Next steps:"
+    echo "  - Check resources: terraform show"
+    echo "  - Get outputs: terraform output"
+    echo "  - Verify EKS: aws eks describe-cluster --name project_1-${ENVIRONMENT}-eks --endpoint-url=http://localhost:4566"
 else
-    log_error "Terraform $ACTION failed!"
+    log_error "Terraform deployment failed!"
     exit 1
 fi
